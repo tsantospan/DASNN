@@ -176,4 +176,4 @@ More details with the structures :
 
 Helpful websites to design convolutional structures : 
 - [layer-calc.com](http://layer-calc.com)
-- [madebyollin.github.io/convnet-calculator](madebyollin.github.io/convnet-calculator)
+- [madebyollin.github.io/convnet-calculator](https://madebyollin.github.io/convnet-calculator)
