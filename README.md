@@ -175,5 +175,5 @@ More details with the structures :
 - *"rectplus"* : Same thing, but with vertical convolutions from the beginning and with one more step.
 
 Helpful websites to design convolutional structures : 
-- [layer-calc.com](layer-calc.com)
+- [layer-calc.com](http://layer-calc.com)
 - [madebyollin.github.io/convnet-calculator](madebyollin.github.io/convnet-calculator)
