@@ -1,6 +1,6 @@
 # DASNN : extracting vehicles characteristics from DAS data
 
-This folder is meant for training and testing a convolutionnal neural network to label characteristics of vechicles with DAS image data. 
+This folder is meant for training and testing a convolutionnal neural network to label characteristics of vechicles with DAS image data with neural networks. 
 
 This README is subdivised in x parts : 
 - [Folders description](#folder-description)
@@ -175,5 +175,5 @@ More details with the structures :
 - *"rectplus"* : Same thing, but with vertical convolutions from the beginning and with one more step.
 
 Helpful websites to design convolutional structures : 
-- layer-calc.com
-- madebyollin.github.io/convnet-calculator
+- [layer-calc.com](layer-calc.com)
+- [madebyollin.github.io/convnet-calculator](madebyollin.github.io/convnet-calculator)
