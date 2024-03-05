@@ -2,7 +2,7 @@
 
 This folder is meant for training and testing a convolutionnal neural network to label characteristics of vechicles with DAS image data with neural networks. 
 
-This README is subdivised in x parts : 
+This README is subdivised in 6 parts : 
 - [Folders description](#folder-description)
 - [Requirements](#requirements)
 - [Functions and classes description](#functions-and-classes-description)
