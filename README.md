@@ -68,6 +68,16 @@ The main script has the following steps :
 - The NN is initialized, enventually loaded from a saved one.
 - We launch **train_model.py**
 
+### Test script
+I began with a test.py file. For the moment, for some reason that I fail to understand, the results in test.py are very bad with a NN trained with batchnorm.
+I'm working on it (maybe I will give up) but for the moment just use test.py with models trained without batchnorm.
+
+In test.py, all the data changes (input and output) are made in the function model.predict. The change in square is not done for the moment, this is a TODO.
+It is important to provide the same arguments (except cbrt) that were used for the training; without this the model can't be loaded.
+
+One particular point with cbrt : in test.py the option cbrt is not to use if you provide already cube rooted images. In this case, just indicate the appropriate amplitude-img. Indeed, in test.py, if we use --cbrt, we cube root the image directly in the code.
+
+test.py will take test input images, predict the labels, print them (and the true labels). It will also save (square) images with the (text) results in the title. All is saved by default in results/test/ (but it can be changed).
 
 ## Data details
 
@@ -156,6 +166,7 @@ For the moment, after a few tests, here is a good configuration I'd recommend fo
 ```
 python3 train.py --norm-images --labels-out tanh --autolr --batchnorm
 ```
+Caution ! The training behaves very well, the validation as well, but for some reason (I CAN'T FIND WHY) when we try it outside of the training loop the results are very bad (even on training data !!!). This problem is only with batchnorm, so for the moment don't use batchnorm (or inquire on the reason why it makes the results bad before). 
 
 ## Details on the convolutional structures
 There are two main possible convolutional structures : square and rectangle. In the square one, we transform the images into squares (by repeating valyes or interpolating). Therefore the convolutional structures are meant to work with squared 900x900 images. In the rectangle one, we let the images as rectangles. The convolutional structures are meant to work with 900x25 images.

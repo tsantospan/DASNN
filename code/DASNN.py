@@ -5,6 +5,8 @@ import os
 from os import listdir
 import numpy as np
 flattening = nn.Flatten()
+
+import matplotlib.pyplot as plt
 class DASNN(torch.nn.Module):
     def __init__(self, shape_mode="squaresmall", outfunction="tanh", outFC=0, leaky=False, batchnorm=False):
         super().__init__()
@@ -153,6 +155,48 @@ class DASNN(torch.nn.Module):
         else:
             outFC = self.FC(out_conv)
         return self.outlayer(outFC)
+    
+    def predict(self, image, og_transform_out="tanh", range_mode="norm", range_input=None, max_values=None, min_values=None):
+        
+        image_ = image.copy()
+       
+        if "cbrt" in range_mode:
+            image_ = np.cbrt(image_)
+        if "norm" in range_mode:
+            if range_input is None:
+                if range_mode == "norm":
+                    range_input = 0.00014
+                else: #elif range_mode == "cbrt_norm"
+                    range_input = 0.06
+            image_ = image_ / range_input
+        print(range_mode, np.max(image_), np.min(image_))
+        #plt.imshow(image_, cmap="bwr")
+        #plt.colorbar()
+        #plt.show()
+        device=torch.device('cpu')#TODO
+        image_ = torch.Tensor(image_)
+        image_batch = torch.unsqueeze(torch.unsqueeze(image_, 0), 0)
+        results = self.forward(image_batch.to(device))[0].detach().cpu()
+        print(results)
+        if og_transform_out == "tanh":
+            if max_values is None or min_values is None:
+                max_values = np.array([80000, 120, 1])
+                min_values = np.array([0, 50, 0])
+            mu_values = (max_values + min_values)/2
+            sig_values = (max_values - min_values)/2
+            results = results*sig_values + mu_values
+        elif og_transform_out == "relu_norm":
+            if max_values is None:
+                mu_values = np.array([80000, 120, 1])
+                sig_values = np.array([0, 0, 0])
+            else:
+                mu_values = np.zeros(len(max_values))
+                sig_values = max_values
+            results = results*sig_values + mu_values
+
+        #print(max_values, min_values, sig_values, mu_values)
+        print(results)
+        return results
 
 class ImageDAStaset(Dataset):
     def __init__(self, root, img_transform=None, label_transform=None, mode_set="train", mu_labels=None, sig_labels=None):
