@@ -13,12 +13,6 @@ import matplotlib.pyplot as plt
 
 from DASNN import *
 
-
-max__ =  torch.Tensor([80000, 120, 1])
-min__ =  torch.Tensor([0, 50, 0])
-mu__ = (max__ + min__)/2
-sig__ = (max__ - min__)/2
-
 def train_model(
         model,
         device,
@@ -61,6 +55,8 @@ def train_model(
 
     # 3. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    #optimizer = optim.RMSprop(model.parameters(),
+    #                          lr=learning_rate, weight_decay=1e-8, momentum=0.999)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)
     grad_scaler = torch.cuda.amp.GradScaler(enabled=False)
     criterion = nn.MSELoss()
@@ -92,8 +88,6 @@ def train_model(
                 labels_pred = model(images)
                 if print_example:
                     print("\nTrue labels (normed)     :",true_labels[0],"\nPredicted labels (normed):",labels_pred[0])
-                    print("\nTrue labels (og)     :",true_labels[0]*sig__.to(device) + mu__.to(device),"\nPredicted labels (og):",labels_pred[0]*sig__.to(device) + mu__.to(device), "\n")
-                    print(torch.min(images[0]), torch.max(images[0]), "\n")
                 if separate_loss:
                     loss = criterion(labels_pred[:,:2], true_labels[:,:2])
                     if labels_out == "tanh":
@@ -162,8 +156,7 @@ def train_model(
                                 if print_example:
 
                                     print("\Validation :\nTrue labels (normed)     :",label_true[0],"\nPredicted labels (normed):",pred_label[0])
-                                    print("\nTrue labels (og)     :",label_true[0]*sig__.to(device) + mu__.to(device),"\nPredicted labels (og):",pred_label[0]*sig__.to(device) + mu__.to(device), "\n")
-                
+                                    
                             if separate_loss:
                                 score += criterion(pred_label[:,:2], label_true[:,:2])
                                 if labels_out == "tanh":
@@ -270,17 +263,17 @@ if __name__ == '__main__':
         if args.amplitude_img is None:
             if args.cbrt:
                 print("Min max images : taking default cbrt values.")
-                mini_img = 0.06
-                maxi_img = -0.06
+                mini_img = -0.06
+                maxi_img = 0.06
                 if args.dir_dataset == "../data/datasets/": # Just in case someone forgets to provide the appropriate dataset directory
                     args.dir_dataset = "../data/datasets_cbrt/"
             else:
                 print("Min max images : taking default values.")
-                mini_img = 0.00014
-                maxi_img = -0.00014
+                mini_img = -0.00014
+                maxi_img = 0.00014
         else:
-            mini_img = args.amplitude_img
-            maxi_img = - args.amplitude_img
+            mini_img = - args.amplitude_img
+            maxi_img = args.amplitude_img
 
         mu_img = (maxi_img + mini_img)/2
         sig_img = (maxi_img - mini_img)/2

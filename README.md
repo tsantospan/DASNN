@@ -69,15 +69,23 @@ The main script has the following steps :
 - We launch **train_model.py**
 
 ### Test script
-I began with a test.py file. For the moment, for some reason that I fail to understand, the results in test.py are very bad with a NN trained with batchnorm.
-I'm working on it (maybe I will give up) but for the moment just use test.py with models trained without batchnorm.
+In *test.py*, all the data changes (input and output) are made in the function model.predict. The square transformation is not done for the moment, this is a TODO.
+It is important to provide the same arguments (except cbrt) that were used for the training; without this, the model can't be loaded.
 
-In test.py, all the data changes (input and output) are made in the function model.predict. The change in square is not done for the moment, this is a TODO.
-It is important to provide the same arguments (except cbrt) that were used for the training; without this the model can't be loaded.
+One particular point with cbrt : in *test.py* the option --cbrt computes the cube root in the code. Therefore, contrary to for *train.py* (where we needed precomputed cube root), don't use --cbrt if you provide precomputed cube rooted images.
+If you want to work with cube root images, you can either : 
+- provide images that are already cube rooted, not use --cbrt, and provide the appropriate --amplitude-img (don't take the default)
+- provide normal images, and use --cbrt (you can also provide the --amplitude-img, optionally)
 
-One particular point with cbrt : in test.py the option cbrt is not to use if you provide already cube rooted images. In this case, just indicate the appropriate amplitude-img. Indeed, in test.py, if we use --cbrt, we cube root the image directly in the code.
+test.py will take input images, predict the labels, print them (and the true labels). It will also save (square) images with the (text) results in the title. It also shows correlations between true and predicted labels, for each dimension. All is saved by default in results/test/ (but it can be changed).
 
-test.py will take test input images, predict the labels, print them (and the true labels). It will also save (square) images with the (text) results in the title. All is saved by default in results/test/ (but it can be changed).
+For the moment, I tested the basic configuration (no cbrt, default amplitude-img, default max and min output values, no use of square images).
+So here is a TODO list :
+- check if cbrt is ok
+- check if taking no-default values is ok
+- check of resizing into square is ok
+
+And make all the updates you want to make better visualization of the results
 
 ## Data details
 

@@ -1,16 +1,11 @@
 import torch
-import torch.nn as nn
-import torchvision
-import torchvision.transforms as transforms
-from torchvision.transforms import InterpolationMode
-from torch import optim
-from torch.utils.data import DataLoader, random_split, Dataset
-from tqdm import tqdm
 
 from os import listdir
 import argparse
 from pathlib import Path
 import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
 
 from DASNN import *
 
@@ -97,40 +92,47 @@ if __name__ == '__main__':
 
 
     # Finally, the predictor
+    model.eval()
     def predict(image):
         return model.predict(image, og_transform_out=args.labels_out, 
                             range_mode=range_mode, range_input=args.amplitude_img, 
-                            max_values=max_out, min_values=min_out)
+                            max_values=max_out, min_values=min_out,
+                            resize_square=args.resize_square)
     
 
 
     # Getting test data
+    print(args.dir_test)
     labels_dir = listdir(args.dir_test+"labels/")
     labels_dir.sort()
     images_dir = listdir(args.dir_test+"images/")
     images_dir.sort()
 
     # Test loop
-    model.train()
     
-    L_images=[]
     L_true_labs = []
     L_predicted = []
     
     index = np.arange(len(images_dir))
     np.random.shuffle(index)
-    #for i in range(min(len(images_dir), args.ntest)):
-    for i in index[:64]:
-
+    for i in range(min(len(images_dir), args.ntest)):
+    #for i in index[:args.ntest]:
+        
+        print("\n",labels_dir[i], images_dir[i])
+        
+        # Getting data
         label = np.loadtxt(args.dir_test+"labels/"+labels_dir[i])
         image = np.load(args.dir_test+"images/"+images_dir[i])
-        L_images.append(image)
+
         L_true_labs.append(label)
-        print(label)
+
+        # Prediction
         with torch.no_grad():
-            L_predicted.append(predict(image).numpy().astype(np.float32))
-        print("\n",labels_dir[i], images_dir[i])
-        predicted = list(predict(image).numpy().astype(np.float32))
+            predicted = list(predict(image).numpy().astype(np.float32))
+        
+        L_predicted.append(predicted)
+        
+        # Saving result in image
         label_ = list(label.astype(np.float32))
         plt.imshow(image, cmap="bwr", aspect="auto")
         plt.colorbar()
@@ -138,57 +140,46 @@ if __name__ == '__main__':
         text += "Predicted : "+str(predicted[0])+", "+str(predicted[1]) + ", "+str(int(np.round(predicted[2]))) + " ("+str(predicted[2]) + ")\n"
         plt.title(text)
         num = ''.join([x for x in images_dir[i] if x.isdigit()])
-        print(num, images_dir[i])
         plt.savefig(args.dir_results + "res_test_"+num+".png")
         plt.close("all")
+        
+        # Print results
         print(label_)
         print(predicted)
     
+    # Preparing correlation figures
+    L_true_labs = np.array(L_true_labs)
+    L_predicted= np.array(L_predicted)
 
-
-    chantier=False
-    if chantier:
-        # Verif compare to batch
-
-        img_transforms = [transforms.ToTensor()]
-        img_transforms.append(transforms.Normalize((0,), (0.00014,)))
+    plt.plot(L_true_labs[:,0],L_true_labs[:,0])
+    plt.plot(L_true_labs[:,0], L_predicted[:,0], ".")
+    plt.xlabel("True weight")
+    plt.ylabel("Predicted weight")
+    plt.title("Weight")
+    plt.savefig(args.dir_results + "correlation_weights.png")
+    plt.savefig(args.dir_results + "correlation_weights.pdf")
+    plt.close("all")
     
-        dataset = ImageDAStaset(root = "../data/datasets/",
-            img_transform = transforms.Compose(img_transforms),
-            label_transform=None
-            )
-        loader_args = dict(batch_size= 64, num_workers=os.cpu_count(), pin_memory=True)
-        train_loader = DataLoader(dataset, shuffle=True, **loader_args)
+    plt.plot(L_true_labs[:,1],L_true_labs[:,1])
+    plt.plot(L_true_labs[:,1], L_predicted[:,1], ".")
+    plt.xlabel("True speed")
+    plt.ylabel("Predicted speed")
+    plt.title("Speed")
+    plt.savefig(args.dir_results + "correlation_speed.png")
+    plt.savefig(args.dir_results + "correlation_speed.pdf")
+    plt.close("all")
     
-        for truc in train_loader:
-            batch, label = truc[0], truc[1]
-            if True:
-                break
-        batch = batch.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
+    plt.plot(L_true_labs[:,2], L_predicted[:,2], ".")
+    plt.xlabel("True lane")
+    plt.ylabel("Predicted lane")
+    plt.title("Lane")
+    plt.savefig(args.dir_results + "correlation_lane.png")
+    plt.savefig(args.dir_results + "correlation_lane.pdf")
+    plt.close("all")
 
-    
-    
-        #batch = torch.unsqueeze(torch.Tensor(np.array(L_images)), 1)
-        #batch = batch / 0.00014
-        print(batch.shape, torch.max(batch), torch.min(batch))
-        with torch.no_grad():
-            all_labels=model(batch.to(device)).cpu()
-
-        mu_values = (max_out + min_out)/2
-        sig_values = (max_out - min_out)/2
-
-        print(all_labels.shape, mu_values, sig_values)
-        print(torch.max(batch[1]), all_labels[1], L_true_labs[1])
-        all_labels = all_labels.detach().numpy() * sig_values + mu_values
-
-
-    
-
-        for i in range(64):
-            print("\nTrue       : ", label[i])
-            print("Pred batch : ", all_labels[i])
-        for i in range(64):
-            print("\nTrue       : ", L_true_labs[i])
-            print("Pred one   : ", L_predicted[i])
-            print("Pred batch : ", all_labels[i])
- 
+    cm = confusion_matrix(L_true_labs[:,2], np.round(L_predicted[:,2]))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot()
+    plt.savefig(args.dir_results + "confusion_matrix_lane.png")
+    plt.savefig(args.dir_results + "confusion_matrix_lane.pdf")
+    plt.close("all")

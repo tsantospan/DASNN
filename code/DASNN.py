@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as nnf
 from torch.utils.data import Dataset
 import os
 from os import listdir
@@ -156,10 +157,12 @@ class DASNN(torch.nn.Module):
             outFC = self.FC(out_conv)
         return self.outlayer(outFC)
     
-    def predict(self, image, og_transform_out="tanh", range_mode="norm", range_input=None, max_values=None, min_values=None):
+    def predict(self, image, og_transform_out="tanh", range_mode="norm", range_input=None, 
+                      max_values=None, min_values=None,resize_square=None):
         
         image_ = image.copy()
        
+
         if "cbrt" in range_mode:
             image_ = np.cbrt(image_)
         if "norm" in range_mode:
@@ -169,15 +172,19 @@ class DASNN(torch.nn.Module):
                 else: #elif range_mode == "cbrt_norm"
                     range_input = 0.06
             image_ = image_ / range_input
-        print(range_mode, np.max(image_), np.min(image_))
-        #plt.imshow(image_, cmap="bwr")
-        #plt.colorbar()
-        #plt.show()
-        device=torch.device('cpu')#TODO
+            
         image_ = torch.Tensor(image_)
+
         image_batch = torch.unsqueeze(torch.unsqueeze(image_, 0), 0)
-        results = self.forward(image_batch.to(device))[0].detach().cpu()
-        print(results)
+        
+        if resize_square is not None:
+            if resize_square == "interp":
+                image_batch = nnf.interpolate(image_batch, size=(900,900), mode="bilinear")
+            else:# elif resize_square == "nearest":
+                image_batch = nnf.interpolate(image_batch, size=(900,900), mode="nearest")
+
+        results = self.forward(image_batch)[0].detach().cpu()
+        
         if og_transform_out == "tanh":
             if max_values is None or min_values is None:
                 max_values = np.array([80000, 120, 1])
@@ -195,7 +202,7 @@ class DASNN(torch.nn.Module):
             results = results*sig_values + mu_values
 
         #print(max_values, min_values, sig_values, mu_values)
-        print(results)
+        #print(results)
         return results
 
 class ImageDAStaset(Dataset):
