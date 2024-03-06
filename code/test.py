@@ -4,6 +4,7 @@ from os import listdir
 import argparse
 from pathlib import Path
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 
@@ -112,12 +113,13 @@ if __name__ == '__main__':
     
     L_true_labs = []
     L_predicted = []
+    L_maxis = []
     
     index = np.arange(len(images_dir))
     np.random.shuffle(index)
     for i in range(min(len(images_dir), args.ntest)):
     #for i in index[:args.ntest]:
-        
+        print(i)         
         print("\n",labels_dir[i], images_dir[i])
         
         # Getting data
@@ -125,6 +127,7 @@ if __name__ == '__main__':
         image = np.load(args.dir_test+"images/"+images_dir[i])
 
         L_true_labs.append(label)
+        L_maxis.append(np.max(image))
 
         # Prediction
         with torch.no_grad():
@@ -134,7 +137,7 @@ if __name__ == '__main__':
         
         # Saving result in image
         label_ = list(label.astype(np.float32))
-        plt.imshow(image, cmap="bwr", aspect="auto")
+        plt.imshow(image, cmap="bwr", aspect="auto", interpolation="none")
         plt.colorbar()
         text = "True : "+str(label_[0])+", "+str(label_[1])+", " + str(int(np.round(label_[2]))) + "\n"
         text += "Predicted : "+str(predicted[0])+", "+str(predicted[1]) + ", "+str(int(np.round(predicted[2]))) + " ("+str(predicted[2]) + ")\n"
@@ -151,8 +154,15 @@ if __name__ == '__main__':
     L_true_labs = np.array(L_true_labs)
     L_predicted= np.array(L_predicted)
 
-    plt.plot(L_true_labs[:,0],L_true_labs[:,0])
-    plt.plot(L_true_labs[:,0], L_predicted[:,0], ".")
+    # Preparing pretty plotting
+    color_list = np.array(["red","green"])
+    dots = [Line2D([0],[0], marker="o", color="w", markerfacecolor="red", markersize=10),
+    Line2D([0],[0], marker="o", color="w", markerfacecolor="green", markersize=10)]
+    lane_prediction = np.round(L_predicted[:,2]).astype(int)
+    
+    plt.plot(L_true_labs[:,0], (L_true_labs[:,0]))
+    plt.scatter(L_true_labs[:,0], L_predicted[:,0], c=color_list[lane_prediction], s=10)
+    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("True weight")
     plt.ylabel("Predicted weight")
     plt.title("Weight")
@@ -161,7 +171,8 @@ if __name__ == '__main__':
     plt.close("all")
     
     plt.plot(L_true_labs[:,1],L_true_labs[:,1])
-    plt.plot(L_true_labs[:,1], L_predicted[:,1], ".")
+    plt.scatter(L_true_labs[:,1], L_predicted[:,1], c=color_list[lane_prediction], s=10)
+    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("True speed")
     plt.ylabel("Predicted speed")
     plt.title("Speed")
@@ -182,4 +193,67 @@ if __name__ == '__main__':
     disp.plot()
     plt.savefig(args.dir_results + "confusion_matrix_lane.png")
     plt.savefig(args.dir_results + "confusion_matrix_lane.pdf")
+    plt.close("all")
+    
+
+    plt.scatter(abs(L_predicted[:,0]-L_true_labs[:,0]), abs(L_predicted[:,1]-L_true_labs[:,1]), c=color_list[lane_prediction], s=10)
+    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    plt.xlabel("Speed error (abs)")
+    plt.ylabel("Weight error (abs)")
+    plt.title("Error comparison")
+    plt.savefig(args.dir_results + "weight_vs_speed_abserrors.png")
+    plt.savefig(args.dir_results + "weight_vs_speed_abserrors.pdf")
+    plt.close("all")
+
+    plt.scatter(L_predicted[:,0]-L_true_labs[:,0], L_predicted[:,1]-L_true_labs[:,1], c=color_list[lane_prediction], s=10)
+    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    plt.xlabel("Weight error")
+    plt.ylabel("Speed error")
+    plt.title("Error comparison")
+    plt.savefig(args.dir_results + "weight_vs_speed_errors.png")
+    plt.savefig(args.dir_results + "weight_vs_speed_errors.pdf")
+    plt.close("all")
+
+    plt.scatter(L_maxis, L_predicted[:,0]-L_true_labs[:,0], c=color_list[lane_prediction], s=10)
+    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    plt.xlabel("Max val image")
+    plt.ylabel("Weight error")
+    plt.title("Error comparison")
+    plt.savefig(args.dir_results + "weight_vs_amp_error.png")
+    plt.savefig(args.dir_results + "weight_vs_amp_error.pdf")
+    plt.close("all")
+
+    plt.scatter(L_maxis, abs(L_predicted[:,0]-L_true_labs[:,0]), c=color_list[lane_prediction], s=10)
+    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    plt.xlabel("Max val image")
+    plt.ylabel("Weight error (abs)")
+    plt.title("Error comparison")
+    plt.savefig(args.dir_results + "weight_vs_amp_abserror.png")
+    plt.savefig(args.dir_results + "weight_vs_amp_abserror.pdf")
+    plt.close("all")
+
+    plt.scatter(L_maxis, abs(L_predicted[:,1]-L_true_labs[:,1], c=color_list[lane_prediction]), s=10)
+    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    plt.xlabel("Max val image")
+    plt.ylabel("Speed error (abs)")
+    plt.title("Error comparison")
+    plt.savefig(args.dir_results + "speed_vs_amp_abserror.png")
+    plt.savefig(args.dir_results + "speed_vs_amp_abserror.pdf")
+    plt.close("all")
+
+    plt.scatter(L_maxis, L_predicted[:,1]-L_true_labs[:,1], c=color_list[lane_prediction], s=10)
+    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    plt.xlabel("Max val image")
+    plt.ylabel("Speed error")
+    plt.title("Error comparison")
+    plt.savefig(args.dir_results + "speed_vs_amp_error.png")
+    plt.savefig(args.dir_results + "speed_vs_amp_error.pdf")
+    plt.close("all")
+
+    plt.plot(L_maxis, L_predicted[:,2]-L_true_labs[:,2], ".")
+    plt.xlabel("Max val image")
+    plt.ylabel("Lane error")
+    plt.title("Error comparison")
+    plt.savefig(args.dir_results + "lane_vs_amp_error.png")
+    plt.savefig(args.dir_results + "lane_vs_amp_error.pdf")
     plt.close("all")

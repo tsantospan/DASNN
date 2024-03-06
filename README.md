@@ -77,13 +77,13 @@ If you want to work with cube root images, you can either :
 - provide images that are already cube rooted, not use --cbrt, and provide the appropriate --amplitude-img (don't take the default).
 - provide normal images, and use --cbrt (you can also provide the --amplitude-img, optionally).
 
-test.py will take input images, predict the labels, print them (and the true labels). It will also save (square) images with the (text) results in the title. It also shows correlations between true and predicted labels, for each dimension. All is saved by default in results/test/ (but it can be changed).
+test.py will take input images, predict the labels, print them (and the true labels). It will also save (square) images with the (text) results in the title. It also shows correlations between true and predicted labels, for each dimension, and correlation between errors. All is saved by default in results/test/ (but it can be changed).
 
 For the moment, I tested the basic configuration (no cbrt, default amplitude-img, default max and min output values, no use of square images).
 So here is a TODO list :
 - check if cbrt is ok.
 - check if taking no-default values is ok.
-- check of resizing into square is ok.
+- check if resizing into square is ok.
 
 And make all the updates you want to make better visualization of the results.
 
