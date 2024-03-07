@@ -10,6 +10,8 @@ from tqdm import tqdm
 import argparse
 from pathlib import Path
 import matplotlib.pyplot as plt
+from os import mkdir
+from os.path import isdir
 
 from DASNN import *
 
@@ -121,6 +123,8 @@ def train_model(
                 if division_step > 0:
                     # Saving plot of losses
                     if global_step % division_step == 0:
+                        if not isdir(dir_loss):
+                            mkdir(dir_loss)
                         plt.figure()
                         plt.plot(L_loss_training)
                         plt.savefig(dir_loss+"training.png")
@@ -154,9 +158,32 @@ def train_model(
                                 pred_label = model(image)
 
                                 if print_example:
+                                    print("\nValidation :\nTrue labels (normed)     :",label_true[0],"\nPredicted labels (normed):",pred_label[0])
+                                
+                                if not isdir(dir_loss+"validation_results"):
+                                    mkdir(dir_loss+"validation_results")
+                                plt.plot(label_true[:,0].cpu(), label_true[:,0].cpu())
+                                plt.plot(label_true[:,0].cpu(), pred_label[:,0].cpu(), ".")
+                                plt.xlabel("True weight")
+                                plt.ylabel("Predicted weight")
+                                plt.title("Weight")
+                                plt.savefig(dir_loss+"validation_results/"+"weight_step"+str(global_step)+".png")
+                                plt.close("all")
+                                plt.plot(label_true[:,1].cpu(), label_true[:,1].cpu())
+                                plt.plot(label_true[:,1].cpu(), pred_label[:,1].cpu(), ".")
+                                plt.xlabel("True speed")
+                                plt.ylabel("Predicted speed")
+                                plt.title("Speed")
+                                plt.savefig(dir_loss+"validation_results/"+"speed_step"+str(global_step)+".png")
+                                plt.close("all")
+                                plt.plot(label_true[:,2].cpu(), label_true[:,2].cpu())
+                                plt.plot(label_true[:,2].cpu(), pred_label[:,2].cpu(), ".")
+                                plt.xlabel("True lane")
+                                plt.ylabel("Predicted lane")
+                                plt.title("Lane")
+                                plt.savefig(dir_loss+"validation_results/"+"lane_step"+str(global_step)+".png")
+                                plt.close("all")
 
-                                    print("\Validation :\nTrue labels (normed)     :",label_true[0],"\nPredicted labels (normed):",pred_label[0])
-                                    
                             if separate_loss:
                                 score += criterion(pred_label[:,:2], label_true[:,:2])
                                 if labels_out == "tanh":

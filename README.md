@@ -56,7 +56,7 @@ The training loop has different steps :
 - computing the gradients and taking a step.
 - printing the step.
 
-Each 1/5 of epoch, we do an evaluation round : we plot and save the loss curves (in training and validation data), and if asked, the learning rate is updated if the validation is not bettering.
+Each 1/5 of epoch, we do an evaluation round : we plot and save the loss curves (in training and validation data), and if asked, the learning rate is updated if the validation is not improving. We also save a plot of predicted vs true labels for a batch of validation data.
 
 At each epoch, if asked, the model is saved.
 
@@ -81,8 +81,7 @@ test.py will take input images, predict the labels, print them (and the true lab
 
 For the moment, I tested the basic configuration (no cbrt, default amplitude-img, default max and min output values, no use of square images).
 So here is a TODO list :
-- check if cbrt is ok.
-- check if taking no-default values is ok.
+- check if taking non default values is ok.
 - check if resizing into square is ok.
 
 And make all the updates you want to make better visualization of the results.
@@ -174,7 +173,9 @@ For the moment, after a few tests, here is a good configuration I'd recommend fo
 ```
 python3 train.py --norm-images --labels-out tanh --autolr --batchnorm
 ```
-Caution ! The training behaves very well, the validation as well, but for some reason (I CAN'T FIND WHY) when we try it outside of the training loop the results are very bad (even on training data !!!). This problem is only with batchnorm, so for the moment don't use batchnorm (or inquire on the reason why it makes the results bad before). 
+
+After a few more tests, the best configuration (I didn't try squared configs) I have is with batchnorm, with normalization, with tanh as output (didn't try other output configuration layers), with cbrt (less big errors on weak amplitudes), outFC=1 (better fit), with rectplus (slighty better fits).
+Adding outFC = 1 made the results clearly better, with only one fully connected layer
 
 ## Details on the convolutional structures
 There are two main possible convolutional structures : square and rectangle. In the square one, we transform the images into squares (by repeating valyes or interpolating). Therefore the convolutional structures are meant to work with squared 900x900 images. In the rectangle one, we let the images as rectangles. The convolutional structures are meant to work with 900x25 images.

@@ -91,7 +91,10 @@ if __name__ == '__main__':
         max_out = None
         min_out = None
 
-
+    # Setting square structure if needed
+    if "square" in args.shape_mode and args.resize_square is None:
+        args.resize_square = "nearest"
+    
     # Finally, the predictor
     model.eval()
     def predict(image):
@@ -232,7 +235,7 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "weight_vs_amp_abserror.pdf")
     plt.close("all")
 
-    plt.scatter(L_maxis, abs(L_predicted[:,1]-L_true_labs[:,1], c=color_list[lane_prediction]), s=10)
+    plt.scatter(L_maxis, abs(L_predicted[:,1]-L_true_labs[:,1]), c=color_list[lane_prediction], s=10)
     plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("Max val image")
     plt.ylabel("Speed error (abs)")
