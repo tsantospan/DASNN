@@ -48,7 +48,7 @@ if __name__ == '__main__':
     #Initating model
     model = DASNN(shape_mode=args.shape_mode, outfunction=args.labels_out, outFC=args.outFC, leaky=args.leaky, batchnorm=args.batchnorm)
     model = model.to(memory_format=torch.channels_last)
-    # Loading model
+    print(model)# Loading model
     if args.load:
         state_dict = torch.load(args.load, map_location=device)
         model.load_state_dict(state_dict)

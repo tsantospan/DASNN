@@ -83,6 +83,7 @@ def train_model(
         with tqdm(total=n_train, desc=f'Epoch {epoch}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
                 images, true_labels = batch[0], batch[1]
+                #print("Len batch train : ", batch[0].shape)
                 #print(torch.max(images[0]))
                 images = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
                 true_labels = true_labels.to(device=device, dtype=torch.float32)
@@ -127,18 +128,26 @@ def train_model(
                             mkdir(dir_loss)
                         plt.figure()
                         plt.plot(L_loss_training)
+                        plt.xlabel("Number of batchs")
+                        plt.ylabel("Loss")
                         plt.savefig(dir_loss+"training.png")
                         plt.close("all")
                         plt.figure()
                         plt.semilogy(L_loss_training)
+                        plt.xlabel("Number of batchs")
+                        plt.ylabel("Loss")
                         plt.savefig(dir_loss+"training_log.png")
                         plt.close("all")
                         plt.figure()
                         plt.plot(L_lr)
+                        plt.xlabel("Number of validation steps")
+                        plt.ylabel("Loss")
                         plt.savefig(dir_loss+"lr.png")
                         plt.close("all")
                         plt.figure()
                         plt.semilogy(L_lr)
+                        plt.xlabel("Number of validation steps")
+                        plt.ylabel("Loss")
                         plt.savefig(dir_loss+"lr_log.png")
                         plt.close("all")
 
@@ -149,6 +158,8 @@ def train_model(
                         with torch.no_grad():
                             for batch in tqdm(val_loader, total=num_val_batches, desc='Validation round', unit='batch', leave=False):
                                 image, label_true = batch[0], batch[1]
+                                #print("Len batch val : ", batch[0].shape)
+                                #print("num_val_batches : ", num_val_batches)
 
                                 # move images and labels to correct device and type
                                 image = image.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
@@ -201,7 +212,7 @@ def train_model(
                                 score += criterion(pred_label, label_true)
 
                         model.train() # Back to training mode
-                        val_score = score / max(num_val_batches, 1)
+                        val_score = score #/ max(num_val_batches, 1)
                         
                         if auto_lr:
                             scheduler.step(val_score)
@@ -209,12 +220,34 @@ def train_model(
                         # Saving plot of losses
                         L_loss_valid.append(float(val_score.cpu().numpy()))
                         plt.figure()
-                        plt.plot(L_loss_valid)
+                        xs_valid = list(range(1,len(L_loss_valid)+1))
+                        plt.plot(xs_valid, L_loss_valid)
+                        plt.xlabel("Number of validation steps")
+                        plt.ylabel("Loss")
                         plt.savefig(dir_loss+"valid.png")
                         plt.close("all")
                         plt.figure()
-                        plt.semilogy(L_loss_valid)
+                        plt.semilogy(xs_valid, L_loss_valid)
+                        plt.xlabel("Number of validation steps")
+                        plt.ylabel("Loss")
                         plt.savefig(dir_loss+"valid_log.png")
+                        plt.close("all")
+                        # In both
+                        plt.figure()
+                        xs_valid = np.array(xs_valid)/5
+                        xs_train = np.array(list(range(0,len(L_loss_training))))/n_train*batch_size
+                        plt.plot(xs_train, L_loss_training)
+                        plt.plot(xs_valid, L_loss_valid)
+                        plt.xlabel("Epochs")
+                        plt.ylabel("Loss")
+                        plt.savefig(dir_loss+"trainvsvalid.png")
+                        plt.close("all")
+                        plt.figure()
+                        plt.semilogy(xs_train, L_loss_training)
+                        plt.semilogy(xs_valid, L_loss_valid)
+                        plt.xlabel("Epochs")
+                        plt.ylabel("Loss")
+                        plt.savefig(dir_loss+"trainvsvalid_log.png")
                         plt.close("all")
 
         if save_checkpoint:

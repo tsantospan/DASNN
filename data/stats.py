@@ -17,10 +17,12 @@ L_labels = np.array(L_labels)
 plt.figure()
 plt.hist(L_labels[:,0])
 plt.title("Weight")
+print("Weights : \n  Min =", np.min(L_labels[:,0]), "\n  Max =",np.max(L_labels[:,0]))
 
 plt.figure()
 plt.hist(L_labels[:,1])
 plt.title("Speed")
+print("\nSpeeds : \n  Min =", np.min(L_labels[:,1]), "\n  Max =",np.max(L_labels[:,1]))
 
 plt.figure()
 plt.hist(L_labels[:,2])
@@ -35,9 +37,9 @@ L_stds = []
 L_meanabs = []
 
 print("Statistics about images...")
-list_dir = os.listdir("all_images_sqrt3")
+list_dir = os.listdir("all_images_cbrt")
 for name in list_dir:
-    A = np.load("all_images_sqrt3/"+name)
+    A = np.load("all_images_cbrt/"+name)
     L_maxs.append(np.max(A))
     L_mins.append(np.min(A))
     L_stds.append(np.std(A))

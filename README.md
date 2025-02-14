@@ -16,7 +16,7 @@ There are 5 folders :
 - **data** : it contains the data. Currently, there is is original data before training/test separation, training data, and test data (+ scripts to prepare data). 
 - **models** : where the different trained models are saved.
 - **notebooks** : notebook versions of the training script (empty for the moment).
-- **results** : contains the results. For the moment, only contains the subfolder **loss**, with curves about the loss during training.
+- **results** : contains the results. For the moment, only contains the subfolder **loss**, with curves about the loss during training, and the subfolder *test* which shows results on test set.
 
 ## Requirements
 The code needs the following python modules (the versions may not be mandatory, it's only the one I have cuurently for reference)
@@ -140,9 +140,9 @@ Some additional arguments can be added.
 **Saving arguments**
 - ```--load``` : give the path (name included) (```str```) of the pretrained model you want to use if there is one. Default is None.
 - ```--save-checkpoints``` : to add if you want to save your model at each step. If not, it will never be saved, even at the end.
-- ```--dir-checkpoints``` : give the path (```str```) of the directory where to save models if you used ```--save-checkpoints```. Default is *"../models/"* (ie it will be saved in the models directory).
+- ```--dir-checkpoints``` : give the path (```str```) of the directory where to save models if you used ```--save-checkpoints```. Default is *"../models/"* (ie it will be saved in the *models* directory).
 - ```--name-model``` : give the name (```str```) prefix under which you want to save the models (the suffix will always be *checkpoint_epochi.pth*). Default is "".
-- ```--dir-loss``` : give the path (```str```) of the directory where to save loss results. Default is *"../results/loss/"* (ie it will be saved in the *models* directory).
+- ```--dir-loss``` : give the path (```str```) of the directory where to save loss results. Default is *"../results/loss/"*.
 
 **Dataset argument**
 - ```--dir-dataset``` :  give the path (```str```) of the directory of the dataset used for training and test. Default is *"../data/datasets/"* (ie it will be saved in the *models* directory).
