@@ -127,6 +127,8 @@ The main script can be simply used, by getting into the **code** folder and ente
 ```
 python3 train.py
 ```
+Be careful : the default arguments don't give good training results. If you want to have good results, use the adviced configurations (see lower)
+
 Some additional arguments can be added.
 
 **Training arguments**
@@ -175,7 +177,11 @@ python3 train.py --norm-images --labels-out tanh --autolr --batchnorm
 ```
 
 After a few more tests, the best configuration (I didn't try squared configs) I have is with batchnorm, with normalization, with tanh as output (didn't try other output configuration layers), with cbrt (less big errors on weak amplitudes), outFC=1 (better fit), with rectplus (slighty better fits).
-Adding outFC = 1 made the results clearly better, with only one fully connected layer
+Adding outFC = 1 made the results clearly better, with only one fully connected layer. This will give the following arguments : 
+
+```
+python3 train.py --norm-images --labels-out tanh --autolr --batchnorm --save-checkpoints --outFC 1 --shape-mode rectplus --cbrt --dir-dataset ../data/datasets_cbrt/
+```
 
 ## Details on the convolutional structures
 There are two main possible convolutional structures : square and rectangle. In the square one, we transform the images into squares (by repeating valyes or interpolating). Therefore the convolutional structures are meant to work with squared 900x900 images. In the rectangle one, we let the images as rectangles. The convolutional structures are meant to work with 900x25 images.
