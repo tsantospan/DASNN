@@ -37,14 +37,17 @@ L_stds = []
 L_meanabs = []
 
 print("Statistics about images...")
-list_dir = os.listdir("all_images_cbrt")
+list_dir = os.listdir("all_images")
 for name in list_dir:
-    A = np.load("all_images_cbrt/"+name)
+    A = np.load("all_images/"+name)
     L_maxs.append(np.max(A))
     L_mins.append(np.min(A))
     L_stds.append(np.std(A))
     L_meanabs.append(np.mean(abs(A)))
-    
+
+print("Max :", np.max(L_maxs), np.cbrt(np.max(L_maxs)))
+print("Min :", np.min(L_mins), np.cbrt(np.min(L_mins)))
+
 plt.figure()
 plt.hist(L_mins)
 plt.title("Mins")

@@ -25,6 +25,7 @@ def get_args():
     parser.add_argument('--amplitude-img', type=float, dest="amplitude_img", default=None, help="Amplitude of images for normalization")
     parser.add_argument('--cbrt', action="store_true", default=False, help="To add if you need to cube root the images before applying the network. Don't use if it's already cube rooted (but don't forget to change amplitude-img).")
     parser.add_argument('--resize-square', default=None, dest="resize_square", help="Method for square resizing (interp or nearest). Put nothing if you don't want resizing")
+    parser.add_argument('--withnoise', action="store_true", default=False, help="For noisy images")    
     
     # Network structure
     parser.add_argument('--shape-mode', default="rect", dest="shape_mode", 
@@ -32,10 +33,15 @@ def get_args():
     parser.add_argument('--outFC', default=0, type=int, help="Number of output fully connected hidden layers")
     parser.add_argument('--leaky', action="store_true", default=False, help="For LeakyReLU instead of ReLU")
     parser.add_argument('--batchnorm', action="store_true", default=False, help="To add BatchNorm")
-
+    parser.add_argument('--dropout', action="store_true", default=False, help="To add Dropout")
+    
     # Output labels arguments
     parser.add_argument('--labels-out', default="tanh", dest="labels_out", help="Last activation layer can be a tanh (tanh), a relu with (relu_norm) or without (relu) normalizing the values. tanh and relu_norm need to provide max and/or min values")
     parser.add_argument('--path-maxmin-out', dest="path_max_min_out", default=None, help="Path of the txt with the max and min values of the labels for normalization. If nothing is provided, default values are taken")
+    
+    # Plots
+    parser.add_argument('--color-noise', action="store_true", default=False, dest="color_noise", help="If the images are noisy, put the color of the dots depending on the relative amplitude of the noise")
+    
     return parser.parse_args()
 
 
@@ -46,7 +52,7 @@ if __name__ == '__main__':
     print(f'Using device {device}')
     
     #Initating model
-    model = DASNN(shape_mode=args.shape_mode, outfunction=args.labels_out, outFC=args.outFC, leaky=args.leaky, batchnorm=args.batchnorm)
+    model = DASNN(shape_mode=args.shape_mode, outfunction=args.labels_out, outFC=args.outFC, leaky=args.leaky, batchnorm=args.batchnorm,dropout=args.dropout)
     model = model.to(memory_format=torch.channels_last)
     print(model)# Loading model
     if args.load:
@@ -109,14 +115,26 @@ if __name__ == '__main__':
     print(args.dir_test)
     labels_dir = listdir(args.dir_test+"labels/")
     labels_dir.sort()
-    images_dir = listdir(args.dir_test+"images/")
+    if args.withnoise:
+        images_dir = listdir(args.dir_test+"noisy/")
+        if args.color_noise:
+            images_nonoise_dir = listdir(args.dir_test+"images/")
+    else:
+        images_dir = listdir(args.dir_test+"images/")
     images_dir.sort()
+    if args.withnoise and args.color_noise:
+        images_nonoise_dir.sort()
+        print(images_dir)
+        print(images_nonoise_dir)
 
     # Test loop
     
     L_true_labs = []
     L_predicted = []
     L_maxis = []
+    if args.withnoise and args.color_noise:
+        L_SNR = [] 
+    
     
     index = np.arange(len(images_dir))
     np.random.shuffle(index)
@@ -127,7 +145,28 @@ if __name__ == '__main__':
         
         # Getting data
         label = np.loadtxt(args.dir_test+"labels/"+labels_dir[i])
-        image = np.load(args.dir_test+"images/"+images_dir[i])
+        if args.withnoise:
+            image = np.load(args.dir_test+"noisy/"+images_dir[i])
+            if args.color_noise:
+                image_nonoise = np.load(args.dir_test+"images/"+images_nonoise_dir[i])
+                
+                noise = image - image_nonoise
+                range_image = np.max(image_nonoise)-np.min(image_nonoise)
+                range_noise = np.max(noise)-np.min(noise)
+                L_SNR.append(range_image/range_noise)
+                
+                v = max(max(np.max(abs(image_nonoise)), np.max(abs(noise))),np.max(abs(image)))
+                #if i<=10:
+                #    plt.figure()
+                #    plt.imshow(image_nonoise,aspect="auto",interpolation="nearest",vmin=-v,vmax=v)
+                #    plt.figure()
+                #    plt.imshow(noise,aspect="auto",interpolation="nearest",vmin=-v,vmax=v)
+                #    plt.figure()
+                #    plt.imshow(image,aspect="auto",interpolation="nearest",vmin=-v,vmax=v)
+                #    plt.title(str(L_SNR[i]))
+                #    plt.show()
+        else:
+            image = np.load(args.dir_test+"images/"+images_dir[i])
 
         L_true_labs.append(label)
         L_maxis.append(np.max(image))
@@ -164,8 +203,13 @@ if __name__ == '__main__':
     lane_prediction = np.round(L_predicted[:,2]).astype(int)
     
     plt.plot(L_true_labs[:,0], (L_true_labs[:,0]))
-    plt.scatter(L_true_labs[:,0], L_predicted[:,0], c=color_list[lane_prediction], s=10)
-    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    if args.withnoise and args.color_noise:
+        plt.scatter(L_true_labs[:,0], L_predicted[:,0], c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.scatter(L_true_labs[:,0], L_predicted[:,0], c=color_list[lane_prediction], s=10)
+        plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("True weight")
     plt.ylabel("Predicted weight")
     plt.title("Weight")
@@ -173,9 +217,25 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "correlation_weights.pdf")
     plt.close("all")
     
+    plt.hist2d(L_true_labs[:,0], L_predicted[:,0], bins=50,density=True)
+    plt.plot(L_true_labs[:,0], (L_true_labs[:,0]))
+    plt.xlabel("True weight")
+    plt.ylabel("Predicted weight")
+    plt.title("Weight")
+    plt.colorbar()
+    plt.savefig(args.dir_results + "correlation_weights_hist2d.png")
+    plt.savefig(args.dir_results + "correlation_weights_hist2d.pdf")
+    plt.close("all")
+    
+    
     plt.plot(L_true_labs[:,1],L_true_labs[:,1])
-    plt.scatter(L_true_labs[:,1], L_predicted[:,1], c=color_list[lane_prediction], s=10)
-    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    if args.withnoise and args.color_noise:
+        plt.scatter(L_true_labs[:,1], L_predicted[:,1], c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.scatter(L_true_labs[:,1], L_predicted[:,1], c=color_list[lane_prediction], s=10)
+        plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("True speed")
     plt.ylabel("Predicted speed")
     plt.title("Speed")
@@ -183,7 +243,23 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "correlation_speed.pdf")
     plt.close("all")
     
-    plt.plot(L_true_labs[:,2], L_predicted[:,2], ".")
+    
+    plt.hist2d(L_true_labs[:,1], L_predicted[:,1], bins=50,density=True)
+    plt.plot(L_true_labs[:,1], (L_true_labs[:,1]))
+    plt.xlabel("True speed")
+    plt.ylabel("Predicted speed")
+    plt.title("Speed")
+    plt.colorbar()
+    plt.savefig(args.dir_results + "correlation_speed_hist2d.png")
+    plt.savefig(args.dir_results + "correlation_speed_hist2d.pdf")
+    plt.close("all")
+    
+    if args.withnoise and args.color_noise:
+        plt.scatter(L_true_labs[:,2], L_predicted[:,2], c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.plot(L_true_labs[:,2], L_predicted[:,2], ".")
     plt.xlabel("True lane")
     plt.ylabel("Predicted lane")
     plt.title("Lane")
@@ -198,9 +274,13 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "confusion_matrix_lane.pdf")
     plt.close("all")
     
-
-    plt.scatter(abs(L_predicted[:,0]-L_true_labs[:,0]), abs(L_predicted[:,1]-L_true_labs[:,1]), c=color_list[lane_prediction], s=10)
-    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    if args.withnoise and args.color_noise:
+        plt.scatter(abs(L_predicted[:,0]-L_true_labs[:,0]), abs(L_predicted[:,1]-L_true_labs[:,1]), c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.scatter(abs(L_predicted[:,0]-L_true_labs[:,0]), abs(L_predicted[:,1]-L_true_labs[:,1]), c=color_list[lane_prediction], s=10)
+        plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("Speed error (abs)")
     plt.ylabel("Weight error (abs)")
     plt.title("Error comparison")
@@ -208,8 +288,13 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "weight_vs_speed_abserrors.pdf")
     plt.close("all")
 
-    plt.scatter(L_predicted[:,0]-L_true_labs[:,0], L_predicted[:,1]-L_true_labs[:,1], c=color_list[lane_prediction], s=10)
-    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    if args.withnoise and args.color_noise:
+        plt.scatter(L_predicted[:,0]-L_true_labs[:,0], L_predicted[:,1]-L_true_labs[:,1], c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.scatter(L_predicted[:,0]-L_true_labs[:,0], L_predicted[:,1]-L_true_labs[:,1], c=color_list[lane_prediction], s=10)
+        plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("Weight error")
     plt.ylabel("Speed error")
     plt.title("Error comparison")
@@ -217,8 +302,13 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "weight_vs_speed_errors.pdf")
     plt.close("all")
 
-    plt.scatter(L_maxis, L_predicted[:,0]-L_true_labs[:,0], c=color_list[lane_prediction], s=10)
-    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    if args.withnoise and args.color_noise:
+        plt.scatter(L_maxis, L_predicted[:,0]-L_true_labs[:,0], c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.scatter(L_maxis, L_predicted[:,0]-L_true_labs[:,0], c=color_list[lane_prediction], s=10)
+        plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("Max val image")
     plt.ylabel("Weight error")
     plt.title("Error comparison")
@@ -226,8 +316,13 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "weight_vs_amp_error.pdf")
     plt.close("all")
 
-    plt.scatter(L_maxis, abs(L_predicted[:,0]-L_true_labs[:,0]), c=color_list[lane_prediction], s=10)
-    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    if args.withnoise and args.color_noise:
+        plt.scatter(L_maxis, abs(L_predicted[:,0]-L_true_labs[:,0]), c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.scatter(L_maxis, abs(L_predicted[:,0]-L_true_labs[:,0]), c=color_list[lane_prediction], s=10)
+        plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("Max val image")
     plt.ylabel("Weight error (abs)")
     plt.title("Error comparison")
@@ -235,8 +330,13 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "weight_vs_amp_abserror.pdf")
     plt.close("all")
 
-    plt.scatter(L_maxis, abs(L_predicted[:,1]-L_true_labs[:,1]), c=color_list[lane_prediction], s=10)
-    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    if args.withnoise and args.color_noise:
+        plt.scatter(L_maxis, abs(L_predicted[:,1]-L_true_labs[:,1]), c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.scatter(L_maxis, abs(L_predicted[:,1]-L_true_labs[:,1]), c=color_list[lane_prediction], s=10)
+        plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("Max val image")
     plt.ylabel("Speed error (abs)")
     plt.title("Error comparison")
@@ -244,8 +344,13 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "speed_vs_amp_abserror.pdf")
     plt.close("all")
 
-    plt.scatter(L_maxis, L_predicted[:,1]-L_true_labs[:,1], c=color_list[lane_prediction], s=10)
-    plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
+    if args.withnoise and args.color_noise:
+        plt.scatter(L_maxis, L_predicted[:,1]-L_true_labs[:,1], c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.scatter(L_maxis, L_predicted[:,1]-L_true_labs[:,1], c=color_list[lane_prediction], s=10)
+        plt.legend(handles=dots, labels=["0","1"], title="Predicted lane")
     plt.xlabel("Max val image")
     plt.ylabel("Speed error")
     plt.title("Error comparison")
@@ -253,7 +358,12 @@ if __name__ == '__main__':
     plt.savefig(args.dir_results + "speed_vs_amp_error.pdf")
     plt.close("all")
 
-    plt.plot(L_maxis, L_predicted[:,2]-L_true_labs[:,2], ".")
+    if args.withnoise and args.color_noise:
+        plt.scatter(L_maxis, L_predicted[:,2]-L_true_labs[:,2], c=L_SNR, s=10)
+        cbar = plt.colorbar()
+        cbar.set_label("Signal to noise (max - min amplitude) ratio")
+    else:
+        plt.plot(L_maxis, L_predicted[:,2]-L_true_labs[:,2], ".")
     plt.xlabel("Max val image")
     plt.ylabel("Lane error")
     plt.title("Error comparison")

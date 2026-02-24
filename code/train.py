@@ -15,6 +15,10 @@ from os.path import isdir
 
 from DASNN import *
 
+
+
+changing_noise = False
+
 def train_model(
         model,
         device,
@@ -30,7 +34,8 @@ def train_model(
         dir_loss: str = "../results/loss/",
         separate_loss: bool = False,
         labels_out: str = "tanh",
-        print_example: bool = False
+        print_example: bool = False,
+        progressive_noise: bool=False
 ):
     
     # 1. Split into train / validation partitions
@@ -79,10 +84,20 @@ def train_model(
     # 4. Begin training
     for epoch in range(1, epochs + 1):
         model.train() # Training mode
-        
+        if progressive_noise:
+            if epoch <=5:
+                lambda_noise = (epoch-1)/(5-1)
+                optimizer.param_groups[0]['lr'] = 10*optimizer.param_groups[0]['lr']
+                print("Lambda noise :",lambda_noise)    
         with tqdm(total=n_train, desc=f'Epoch {epoch}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
-                images, true_labels = batch[0], batch[1]
+                if progressive_noise:
+                    images, true_labels, images_noise = batch[0], batch[1], batch[2]
+                    images = (1-lambda_noise)*images + lambda_noise*images_noise
+                else:
+                    images, true_labels = batch[0], batch[1]
+                    
+                    
                 #print("Len batch train : ", batch[0].shape)
                 #print(torch.max(images[0]))
                 images = images.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
@@ -157,7 +172,12 @@ def train_model(
 
                         with torch.no_grad():
                             for batch in tqdm(val_loader, total=num_val_batches, desc='Validation round', unit='batch', leave=False):
-                                image, label_true = batch[0], batch[1]
+                                if progressive_noise:
+                                    image, label_true,image_noise = batch[0], batch[1], batch[2]
+                                    image = (1-lambda_noise)*image + lambda_noise*image_noise
+                                else:
+                                    image, label_true = batch[0], batch[1]
+                                
                                 #print("Len batch val : ", batch[0].shape)
                                 #print("num_val_batches : ", num_val_batches)
 
@@ -271,7 +291,9 @@ def get_args():
                         help='Percent of the data that is used as validation (0-100)')
     parser.add_argument('--print-examples', action="store_true", default=False, dest="print_example",
                         help="If you want to show one example of true vs predicted labels at each batch")
-
+    parser.add_argument('--progressive-noise', action="store_true", default=False, dest="progressive_noise", help="To add progressively more noise")
+    parser.add_argument('--changing-noise', action="store_true", default=False, dest="changing_noise", help="To work with different noise each time for the same image")
+    
     # Saving arguments
     parser.add_argument('--load', '-f', type=str, default=False, help='Load model from a .pth file')
     parser.add_argument('--save-checkpoints', action="store_true", dest="save_checkpoint", default=False, 
@@ -283,6 +305,7 @@ def get_args():
     
     # Dataset argument
     parser.add_argument('--dir-dataset', dest="dir_dataset", default="../data/datasets/", help="Dataset directory")    
+    parser.add_argument('--with-noise', action="store_true", default=False, help="For noisy images")    
 
     # Input images arguments
     parser.add_argument('--norm-images', action="store_true", dest="norm_images", default=False, help="Normalize input images")
@@ -294,8 +317,10 @@ def get_args():
     parser.add_argument('--shape-mode', default="rect", dest="shape_mode", 
                         help="Convolutional structure of the network. squaresmall, squarebig, rectsame, rectsamemaxpool or rect (default)")
     parser.add_argument('--outFC', default=0, type=int, help="Number of output fully connected hidden layers")
+    parser.add_argument('--inFC', action="store_true", default=False, help="To use 2 input fully connected layers")
     parser.add_argument('--leaky', action="store_true", default=False, help="For LeakyReLU instead of ReLU")
     parser.add_argument('--batchnorm', action="store_true", default=False, help="To add BatchNorm")
+    parser.add_argument('--dropout', action="store_true", default=False, help="To add Dropout")
     
     # Output labels arguments
     parser.add_argument('--labels-out', default="tanh", dest="labels_out", help="Last activation layer can be a tanh (tanh), a relu with (relu_norm) or without (relu) normalizing the values. tanh and relu_norm need to provide max and/or min values")
@@ -323,14 +348,17 @@ if __name__ == '__main__':
         if args.amplitude_img is None:
             if args.cbrt:
                 print("Min max images : taking default cbrt values.")
-                mini_img = -0.06
-                maxi_img = 0.06
+                mini_img = -0.06   # 0.08188320695692161 with noise
+                maxi_img = 0.06    # 0.08188320695692161
+                if args.with_noise:
+                    mini_img = -0.085
+                    maxi_img = 0.085
                 if args.dir_dataset == "../data/datasets/": # Just in case someone forgets to provide the appropriate dataset directory
                     args.dir_dataset = "../data/datasets_cbrt/"
             else:
                 print("Min max images : taking default values.")
-                mini_img = -0.00014
-                maxi_img = 0.00014
+                mini_img = -0.00015 # 0.0005563842691301197 with noise
+                maxi_img = 0.00015
         else:
             mini_img = - args.amplitude_img
             maxi_img = args.amplitude_img
@@ -386,13 +414,16 @@ if __name__ == '__main__':
         img_transform = transforms.Compose(img_transforms),
         label_transform=transforms.Compose(label_transforms),
         mu_labels=mu_labels,
-        sig_labels=sig_labels
+        sig_labels=sig_labels,
+        with_noise=args.with_noise,
+        progressive_noise=args.progressive_noise,
+        changing_noise=args.changing_noise
         )
 
     ########################
     # Model initialization #
     ######################## 
-    model = DASNN(shape_mode=args.shape_mode, outfunction=args.labels_out, outFC=args.outFC, leaky=args.leaky, batchnorm=args.batchnorm)
+    model = DASNN(shape_mode=args.shape_mode, outfunction=args.labels_out, outFC=args.outFC, leaky=args.leaky, batchnorm=args.batchnorm,inFC=args.inFC,dropout=args.dropout)
     model = model.to(memory_format=torch.channels_last)
 
     if args.load:
@@ -421,6 +452,7 @@ if __name__ == '__main__':
             dir_loss=args.dir_loss,
             separate_loss=args.separate_loss,
             labels_out=args.labels_out,
-            print_example=args.print_example
+            print_example=args.print_example,
+            progressive_noise=args.progressive_noise
         )
 

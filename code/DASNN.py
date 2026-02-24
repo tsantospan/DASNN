@@ -6,19 +6,25 @@ import os
 from os import listdir
 import numpy as np
 flattening = nn.Flatten()
+unflattening = nn.Unflatten(1,(900,25))
 
 import matplotlib.pyplot as plt
+
+
 class DASNN(torch.nn.Module):
-    def __init__(self, shape_mode="squaresmall", outfunction="tanh", outFC=0, leaky=False, batchnorm=False):
+    def __init__(self, shape_mode="squaresmall", outfunction="tanh", outFC=0, leaky=False, batchnorm=False,inFC=False,dropout=False):
         super().__init__()
         self.shape_mode = shape_mode
         self.outfunction=outfunction
         self.outFC=outFC
+        self.inFC=inFC
         self.leaky=leaky
         self.batchnorm=batchnorm
         self.maxpool=False
+        self.dropout=dropout
 
         self.outsize=3
+        
         
 
         # Choice of the structure and corresponding hyper parameters
@@ -68,6 +74,10 @@ class DASNN(torch.nn.Module):
             self.nb_channels = 64
         layers = []
         
+        
+        if "rect" in self.shape_mode and self.inFC:
+            self.inFC1 = nn.Linear(900*25, 900*25)
+        
 
         # Definition fo the different convolutional layers
         for i in range(self.nb_steps):
@@ -115,6 +125,8 @@ class DASNN(torch.nn.Module):
                 layers.append(nn.LeakyReLU(0.2, inplace=True))
             else:
                 layers.append(nn.ReLU(True))
+            if self.dropout:
+                layers.append(nn.Dropout(p=0.2))
             if self.maxpool and i < self.nb_steps-1:
                 layers.append(nn.MaxPool2d((2,1)))
 
@@ -128,7 +140,7 @@ class DASNN(torch.nn.Module):
         #  - MaxPool for rectsamemaxpool (except last layer)
 
         # Now let's go with the final layers
-        if self.outFC > 0:
+        if self.outFC == 1:
             intermediate = (self.outconvsize*self.nb_channels*2**(self.nb_steps) + self.outsize)//2
             self.FC1 = nn.Linear(self.outconvsize*self.nb_channels*2**(self.nb_steps), intermediate)
             #if self.batchnorm:
@@ -137,6 +149,16 @@ class DASNN(torch.nn.Module):
             self.FC2 = nn.Linear(intermediate, self.outsize)
             #if self.batchnorm:
             #    self.FC2 = nn.Sequential(self.FC2, nn.BatchNorm1d(num_features=self.outsize))
+        elif self.outFC > 0:
+
+            intermediate = (self.outconvsize*self.nb_channels*2**(self.nb_steps) + self.outsize)//2
+            self.FC1 = nn.Linear(self.outconvsize*self.nb_channels*2**(self.nb_steps), intermediate)
+            #if self.batchnorm:
+            #    self.FC1 = nn.Sequential(self.FC1, nn.BatchNorm1d(num_features=intermediate))
+            self.intermediatefunc = nn.ReLU(True)
+            
+            self.FC2 = nn.Linear(intermediate, intermediate)
+            self.FC3 = nn.Linear(intermediate, self.outsize)
         else:
             self.FC = nn.Linear(self.outconvsize*self.nb_channels*2**(self.nb_steps), self.outsize)
             #if self.batchnorm:
@@ -149,10 +171,18 @@ class DASNN(torch.nn.Module):
             self.outlayer = nn.ReLU(True)
 
     def forward(self, x):
+    
+        if "rect" in self.shape_mode and self.inFC:
+            x = flattening(x)
+            x = self.inFC1(x)
+            x = unflattening(x)
+            
         out_conv = self.main_module(x)
         out_conv = flattening(out_conv)
-        if self.outFC > 0:
+        if self.outFC == 1:
             outFC = self.FC2(self.intermediatefunc(self.FC1(out_conv)))
+        elif self.outFC > 0:
+            outFC = self.FC3(self.intermediatefunc(self.FC2(self.intermediatefunc(self.FC1(out_conv)))))
         else:
             outFC = self.FC(out_conv)
         return self.outlayer(outFC)
@@ -161,16 +191,16 @@ class DASNN(torch.nn.Module):
                       max_values=None, min_values=None,resize_square=None):
         
         image_ = image.copy()
-       
+        print("Range mode : ",range_mode)
 
         if "cbrt" in range_mode:
             image_ = np.cbrt(image_)
         if "norm" in range_mode:
             if range_input is None:
                 if range_mode == "norm":
-                    range_input = 0.00014
+                    range_input = 0.00015  # 0.0005563842691301197 with noise
                 else: #elif range_mode == "cbrt_norm"
-                    range_input = 0.06
+                    range_input = 0.06  # Noisy images : 0.08188320695692161
             image_ = image_ / range_input
             
         image_ = torch.Tensor(image_)
@@ -206,13 +236,18 @@ class DASNN(torch.nn.Module):
         return results
 
 class ImageDAStaset(Dataset):
-    def __init__(self, root, img_transform=None, label_transform=None, mode_set="train", mu_labels=None, sig_labels=None):
+    def __init__(self, root, img_transform=None, label_transform=None, mode_set="train", mu_labels=None, sig_labels=None,with_noise=False,progressive_noise=False,changing_noise=False):
         self.root_dir=root
         self.img_dir=root+mode_set+"/images/"
         self.label_dir=root+mode_set+"/labels/"
+        self.img_noisy_dir=root+mode_set+"/noisy/"
         self.img_transform = img_transform
         self.label_transform = label_transform
         self.mode_set = mode_set
+        self.with_noise = with_noise
+        self.progressive_noise = progressive_noise
+        self.changing_noise = changing_noise
+        self.list_dir_noise = os.listdir("../data/all_noise")
         
         if mu_labels is None or sig_labels is None:
             self.transform_values = False
@@ -224,8 +259,32 @@ class ImageDAStaset(Dataset):
     def __len__(self):
         return len(listdir(self.img_dir))
     def __getitem__(self, idx):
-        img_path = self.img_dir+"img_"+self.mode_set+"_"+str(idx)+".npy"
+        if self.with_noise:
+            img_path = self.img_noisy_dir+"img_"+self.mode_set+"_"+str(idx)+".npy"
+        else:
+            img_path = self.img_dir+"img_"+self.mode_set+"_"+str(idx)+".npy"
+           
+                
+                
+                
+        if self.progressive_noise:
+            img_noise_path = self.img_noisy_dir+"img_"+self.mode_set+"_"+str(idx)+".npy"
+            image_noise = np.load(img_noise_path)
+        
         image = np.load(img_path)
+        
+        if self.changing_noise:
+            noise = np.load(f"allnoise/{np.random.choice(list_dir_noise)}")
+            range_noise = np.max(noise) - np.min(noise)
+            if "cbrt" in self.root_dir:
+                image = image**3
+            range_img = np.max(img) - np.min(img)
+            fact = np.random.rand()*0.8+0.2
+            noise *= (range_img/range_noise)/fact
+            image = image+noise
+            if "cbrt" in self.root_dir:
+                image = np.cbrt(image)
+        
         label_path = self.label_dir+"label_"+self.mode_set+"_"+str(idx)+".txt"
         if self.transform_values:
             label = (torch.Tensor(np.loadtxt(label_path)) - self.mu_labels )/ self.sig_labels
@@ -234,7 +293,11 @@ class ImageDAStaset(Dataset):
 
         if self.img_transform:
             image = self.img_transform(image)
+            if self.progressive_noise:
+                image_noise = self.img_transform(image_noise)
         if self.label_transform:
             label = self.label_transform(label)
-
-        return image, label
+        if self.progressive_noise:
+            return image, label, image_noise
+        else:
+            return image, label
